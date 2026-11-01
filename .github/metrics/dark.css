@@ -1,0 +1,21 @@
+
+/* ------------------------------------------------------------------------- */
+/* Dark-mode overrides appended by zvonkok/zvonkok (.github/metrics/dark.css) */
+/* GitHub serves the cards as <img>, and browsers still evaluate              */
+/* prefers-color-scheme inside an SVG document, so one render serves both.    */
+/* ------------------------------------------------------------------------- */
+@media (prefers-color-scheme: dark) {
+  svg { color: #9da7b3; }
+  h1, h2 { color: #58a6ff; }
+  .field svg { fill: #8b949e; }
+  .field.error { color: #f85149; }
+  .field.error svg { fill: #f85149; }
+  :root {
+    --color-calendar-graph-day-bg: #161b22;
+    --color-calendar-graph-day-border: rgba(240, 246, 252, 0.06);
+    --color-calendar-graph-day-L1-bg: #0e4429;
+    --color-calendar-graph-day-L2-bg: #006d32;
+    --color-calendar-graph-day-L3-bg: #26a641;
+    --color-calendar-graph-day-L4-bg: #39d353;
+  }
+}

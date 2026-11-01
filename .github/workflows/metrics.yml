@@ -1,174 +1,229 @@
+# Renders the profile cards with lowlighter/metrics.
+#
+# Upstream metrics is unmaintained, so each card step runs a locally built,
+# patched image (see .github/metrics/README.md). Every card is rendered with
+# plugins_errors_fatal so a broken plugin fails loudly instead of committing an
+# "Unexpected error" card; the cards that did render are still committed.
 name: Metrics
-on:
-  # Schedule daily updates
-  schedule: [{cron: "0 0 * * *"}]
-  # (optional) Run workflow manually
-  workflow_dispatch:
-  # (optional) Run workflow when pushing on master/main
-  push: {branches: ["master", "main"]}
-jobs:
-  achievements:
-    runs-on: ubuntu-latest
-    environment: 
-      name: production
-    permissions:
-      contents: write
-    steps:
-      - uses: lowlighter/metrics@latest
-        with:
-          filename: achievements.svg
-          token: ${{ secrets.METRICS_TOKEN }}
-          committer_token: ${{ secrets.GITHUB_TOKEN }}
-          user: zvonkok
-          base: achievements
-          plugin_achievements: yes
-          plugin_achievements_threshold: B      # Display achievements with rank B or higher
-          plugin_achievements_secrets: yes      # Display unlocked secrets achievements
-          plugin_achievements_display: compact  # Use compact display
-          plugin_achievements_limit: 0          # Display all unlocked achievements (no limit)
 
-  github-metrics:
+on:
+  schedule:
+    - cron: "0 4 * * *" # daily, 04:00 UTC (midnight in Toronto during DST)
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [".github/**"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: metrics
+  cancel-in-progress: false
+
+jobs:
+  metrics:
     runs-on: ubuntu-latest
-    environment: 
-      name: production
     permissions:
       contents: write
     steps:
-      - uses: lowlighter/metrics@latest
+      - uses: actions/checkout@v4
+
+      - name: Build patched metrics image
+        run: docker build -t metrics:3.35.0-beta .github/metrics
+
+      # ----------------------------------------------------------------------
+      # Cards. Each step shares the same boilerplate:
+      #   output_action: none     -> write to /metrics_renders only, commit below
+      #   use_prebuilt_image: no  -> makes the action reuse metrics:3.35.0-beta
+      #   plugins_errors_fatal    -> fail the step rather than render an error
+      # ----------------------------------------------------------------------
+      - name: Header
+        id: header
+        continue-on-error: true
+        uses: lowlighter/metrics@366f8b9dfe3a59656c67d5dcad9950f59c9bc96d # master, 2023-12-18
         with:
           filename: header.svg
-          # You'll need to setup a personal token in your secrets.
           token: ${{ secrets.METRICS_SECRET }}
-          # GITHUB_TOKEN is a special auto-generated token used for commits
-          committer_token: ${{ secrets.GITHUB_TOKEN }}
-
-          # Options
           user: zvonkok
           template: classic
           base: header
-          config_timezone: ${{ secrets.USER_TIMEZONE }}
-  lines:
-    runs-on: ubuntu-latest
-    environment: 
-      name: production
-    permissions:
-      contents: write
-    steps:
-      - uses: lowlighter/metrics@latest
+          config_timezone: America/Toronto
+          output_action: none
+          use_prebuilt_image: no
+          plugins_errors_fatal: yes
+
+      - name: Notable contributions
+        id: notable
+        continue-on-error: true
+        uses: lowlighter/metrics@366f8b9dfe3a59656c67d5dcad9950f59c9bc96d # master, 2023-12-18
         with:
-          filename: lines-of-code.svg
+          filename: notable.svg
           token: ${{ secrets.METRICS_SECRET }}
-          committer_token: ${{ secrets.GITHUB_TOKEN }}
-          base: "repositories"
-          plugin_lines: yes
-
-  acti_comm:
-    runs-on: ubuntu-latest
-    environment: 
-      name: production
-    permissions:
-      contents: write
-    steps:
-      - uses: lowlighter/metrics@latest
-        with:
-          filename: acti_comm.svg
-          # You'll need to setup a personal token in your secrets.
-          token: ${{ secrets.METRICS_SECRET }}
-          # GITHUB_TOKEN is a special auto-generated token used for commits
-          committer_token: ${{ secrets.GITHUB_TOKEN }}
-
-          # Options
-          user: zvonkok
-          template: classic
-          base: activity, community
-          config_timezone: ${{ secrets.USER_TIMEZONE }}
-
-  iso_calender:
-    runs-on: ubuntu-latest
-    environment: 
-      name: production
-    permissions:
-      contents: write
-    steps:
-      - uses: lowlighter/metrics@latest
-        with:
-          filename: iso_calender.svg
-          # You'll need to setup a personal token in your secrets.
-          token: ${{ secrets.METRICS_SECRET }}
-          # GITHUB_TOKEN is a special auto-generated token used for commits
-          committer_token: ${{ secrets.GITHUB_TOKEN }}
-
-          # Options
           user: zvonkok
           template: classic
           base: ""
-          config_timezone: ${{ secrets.USER_TIMEZONE }}
-          plugin_isocalendar: yes
-          plugin_isocalendar_duration: half-year
+          config_timezone: America/Toronto
+          output_action: none
+          use_prebuilt_image: no
+          plugins_errors_fatal: yes
+          plugin_notable: yes
+          plugin_notable_from: all
+          plugin_notable_repositories: yes
+          plugin_notable_indepth: yes
+          plugin_notable_types: commit, pull_request, issue
 
-  habits:
-    runs-on: ubuntu-latest
-    environment: 
-      name: production
-    permissions:
-      contents: write
-    steps:
-      - uses: lowlighter/metrics@latest
+      - name: Achievements
+        id: achievements
+        continue-on-error: true
+        uses: lowlighter/metrics@366f8b9dfe3a59656c67d5dcad9950f59c9bc96d # master, 2023-12-18
         with:
-          filename: github-habits.svg
+          filename: achievements.svg
           token: ${{ secrets.METRICS_SECRET }}
-          committer_token: ${{ secrets.GITHUB_TOKEN }}
-          config_timezone: ${{ secrets.USER_TIMEZONE }} # Set timezone
-          user: zvonkok
-          base: ""
-          template: classic
-          plugin_habits: yes
-          plugin_habits_from: 200       # Use 200 events to compute habits
-          plugin_habits_days: 14        # Keep only events from last 14 days
-          plugin_habits_charts: yes     # Display charts section
-          plugin_habits_trim: yes       # Trim unused hours on daily chart
-
-  issue_pr_lang:
-    runs-on: ubuntu-latest
-    environment: 
-      name: production
-    permissions:
-      contents: write
-    steps:
-      - uses: lowlighter/metrics@latest
-        with:
-          filename: issue_pr_lang.svg
-          # You'll need to setup a personal token in your secrets.
-          token: ${{ secrets.METRICS_SECRET }}
-          # GITHUB_TOKEN is a special auto-generated token used for commits
-          committer_token: ${{ secrets.GITHUB_TOKEN }}
-
-          # Options
           user: zvonkok
           template: classic
           base: ""
-          config_timezone: ${{ secrets.USER_TIMEZONE }}
-          plugin_followup: yes
+          config_timezone: America/Toronto
+          output_action: none
+          use_prebuilt_image: no
+          plugins_errors_fatal: yes
+          plugin_achievements: yes
+          plugin_achievements_threshold: B
+          plugin_achievements_secrets: yes
+          plugin_achievements_display: compact
+          plugin_achievements_limit: 0
+
+      - name: Languages
+        id: languages
+        continue-on-error: true
+        uses: lowlighter/metrics@366f8b9dfe3a59656c67d5dcad9950f59c9bc96d # master, 2023-12-18
+        with:
+          filename: languages.svg
+          token: ${{ secrets.METRICS_SECRET }}
+          user: zvonkok
+          template: classic
+          base: ""
+          config_timezone: America/Toronto
+          output_action: none
+          use_prebuilt_image: no
+          plugins_errors_fatal: yes
           plugin_languages: yes
+          plugin_languages_sections: most-used, recently-used
+          plugin_languages_indepth: yes
+          plugin_languages_details: percentage, lines
+          plugin_languages_limit: 8
+          plugin_languages_recent_days: 30
+          plugin_languages_recent_load: 500
+          plugin_languages_analysis_timeout: 30
 
-
-  repositories:
-    runs-on: ubuntu-latest
-    environment: 
-      name: production
-    permissions:
-      contents: write
-    steps:
-      - uses: lowlighter/metrics@latest
+      - name: Repositories and lines of code
+        id: repositories
+        continue-on-error: true
+        uses: lowlighter/metrics@366f8b9dfe3a59656c67d5dcad9950f59c9bc96d # master, 2023-12-18
         with:
           filename: repositories.svg
-          # You'll need to setup a personal token in your secrets.
           token: ${{ secrets.METRICS_SECRET }}
-          # GITHUB_TOKEN is a special auto-generated token used for commits
-          committer_token: ${{ secrets.GITHUB_TOKEN }}
-
-          # Options
           user: zvonkok
           template: classic
           base: repositories
-          config_timezone: ${{ secrets.USER_TIMEZONE }}          
+          config_timezone: America/Toronto
+          output_action: none
+          use_prebuilt_image: no
+          plugins_errors_fatal: yes
+          plugin_lines: yes
+          plugin_lines_sections: base
+
+      - name: Contribution calendar
+        id: isocalendar
+        continue-on-error: true
+        uses: lowlighter/metrics@366f8b9dfe3a59656c67d5dcad9950f59c9bc96d # master, 2023-12-18
+        with:
+          filename: isocalendar.svg
+          token: ${{ secrets.METRICS_SECRET }}
+          user: zvonkok
+          template: classic
+          base: ""
+          config_timezone: America/Toronto
+          output_action: none
+          use_prebuilt_image: no
+          plugins_errors_fatal: yes
+          plugin_isocalendar: yes
+          plugin_isocalendar_duration: full-year
+
+      - name: Coding habits
+        id: habits
+        continue-on-error: true
+        uses: lowlighter/metrics@366f8b9dfe3a59656c67d5dcad9950f59c9bc96d # master, 2023-12-18
+        with:
+          filename: habits.svg
+          token: ${{ secrets.METRICS_SECRET }}
+          user: zvonkok
+          template: classic
+          base: ""
+          config_timezone: America/Toronto
+          output_action: none
+          use_prebuilt_image: no
+          plugins_errors_fatal: yes
+          plugin_habits: yes
+          plugin_habits_from: 500
+          plugin_habits_days: 30
+          plugin_habits_charts: yes
+          plugin_habits_trim: yes
+
+      - name: Activity and community
+        id: activity
+        continue-on-error: true
+        uses: lowlighter/metrics@366f8b9dfe3a59656c67d5dcad9950f59c9bc96d # master, 2023-12-18
+        with:
+          filename: activity.svg
+          token: ${{ secrets.METRICS_SECRET }}
+          user: zvonkok
+          template: classic
+          base: activity, community
+          config_timezone: America/Toronto
+          output_action: none
+          use_prebuilt_image: no
+          plugins_errors_fatal: yes
+
+      - name: Issues and pull requests
+        id: followup
+        continue-on-error: true
+        uses: lowlighter/metrics@366f8b9dfe3a59656c67d5dcad9950f59c9bc96d # master, 2023-12-18
+        with:
+          filename: followup.svg
+          token: ${{ secrets.METRICS_SECRET }}
+          user: zvonkok
+          template: classic
+          base: ""
+          config_timezone: America/Toronto
+          output_action: none
+          use_prebuilt_image: no
+          plugins_errors_fatal: yes
+          plugin_followup: yes
+          plugin_followup_sections: repositories, user
+          plugin_followup_indepth: yes
+
+      # ----------------------------------------------------------------------
+      # Commit whatever rendered, then surface any failed card.
+      # ----------------------------------------------------------------------
+      - name: Commit refreshed cards
+        run: |
+          set -euo pipefail
+          ls -l /metrics_renders
+          sudo cp /metrics_renders/*.svg .
+          sudo chown "$(id -u):$(id -g)" ./*.svg
+          git add -- '*.svg'
+          if git diff --cached --quiet; then
+            echo "No card changed."
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -m "chore(metrics): refresh cards $(date -u +%Y-%m-%d)"
+          git push
+
+      - name: Fail if any card failed to render
+        if: ${{ contains(steps.*.outcome, 'failure') }}
+        run: |
+          echo "::error::At least one card failed to render; see the failed step(s) above."
+          exit 1
